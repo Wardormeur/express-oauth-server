@@ -4,32 +4,43 @@
  * Module dependencies.
  */
 
-var ExpressOAuthServer = require('../../');
+var HapiOAuthServer = require('../../');
 var Request = require('oauth2-server').Request;
 var Response = require('oauth2-server').Response;
-var express = require('express');
+var hapi = require('hapi');
 var request = require('supertest');
 var sinon = require('sinon');
 var should = require('should');
 
 /**
- * Test `ExpressOAuthServer`.
+ * Test `HapiOAuthServer`.
  */
 
-describe('ExpressOAuthServer', function() {
+describe('HapiOAuthServer', function() {
   var app;
 
   beforeEach(function() {
-    app = express();
+    app = new hapi.Server();
   });
+
+  function checkHapiPluginError (name) {
+    return function (error) {
+      if (error) {
+        console.error('Failed loading a Hapi plugin: "' + name + '".');
+        throw error;
+      }
+    };
+  }
 
   describe('authenticate()', function() {
     it('should call `authenticate()`', function(done) {
-      var oauth = new ExpressOAuthServer({ model: {} });
+      var oauth = new HapiOAuthServer(app, { model: {} });
 
       sinon.stub(oauth.server, 'authenticate').returns({});
 
-      app.use(oauth.authenticate());
+      app.register(oauth, function (err) {
+        checkHapiPluginError('oauth')(err);
+      });
 
       request(app.listen())
         .get('/')
@@ -46,7 +57,7 @@ describe('ExpressOAuthServer', function() {
     });
 
     it('should call `authenticate()` with options', function(done) {
-      var oauth = new ExpressOAuthServer({ model: {} });
+      var oauth = new HapiOAuthServer({ model: {} });
 
       sinon.stub(oauth.server, 'authenticate').returns({});
 
@@ -69,7 +80,7 @@ describe('ExpressOAuthServer', function() {
   describe('authorize()', function() {
     it('should call `authorize()` and end middleware execution', function(done) {
       var nextMiddleware = sinon.spy()
-      var oauth = new ExpressOAuthServer({ model: {} });
+      var oauth = new HapiOAuthServer({ model: {} });
 
       sinon.stub(oauth.server, 'authorize').returns({});
 
@@ -92,7 +103,7 @@ describe('ExpressOAuthServer', function() {
 
     it('should call `authorize()` and continue middleware chain', function(done) {
       var nextMiddleware = sinon.spy()
-      var oauth = new ExpressOAuthServer({ model: {}, continueMiddleware: true });
+      var oauth = new HapiOAuthServer({ model: {}, continueMiddleware: true });
 
       sinon.stub(oauth.server, 'authorize').returns({});
 
@@ -115,7 +126,7 @@ describe('ExpressOAuthServer', function() {
     });
 
     it('should call `authorize()` with options', function(done) {
-      var oauth = new ExpressOAuthServer({ model: {} });
+      var oauth = new HapiOAuthServer({ model: {} });
 
       sinon.stub(oauth.server, 'authorize').returns({});
 
@@ -138,7 +149,7 @@ describe('ExpressOAuthServer', function() {
   describe('token()', function() {
     it('should call `token()` and end middleware chain', function(done) {
       var nextMiddleware = sinon.spy()
-      var oauth = new ExpressOAuthServer({ model: {} });
+      var oauth = new HapiOAuthServer({ model: {} });
 
       sinon.stub(oauth.server, 'token').returns({});
 
@@ -161,7 +172,7 @@ describe('ExpressOAuthServer', function() {
 
     it('should call `token()` and continue middleware chain', function(done) {
       var nextMiddleware = sinon.spy()
-      var oauth = new ExpressOAuthServer({ model: {}, continueMiddleware: true });
+      var oauth = new HapiOAuthServer({ model: {}, continueMiddleware: true });
 
       sinon.stub(oauth.server, 'token').returns({});
 
@@ -184,7 +195,7 @@ describe('ExpressOAuthServer', function() {
     });
 
     it('should call `token()` with options', function(done) {
-      var oauth = new ExpressOAuthServer({ model: {} });
+      var oauth = new HapiOAuthServer({ model: {} });
 
       sinon.stub(oauth.server, 'token').returns({});
 

@@ -1,34 +1,31 @@
 'use strict';
-
+var _ = require('lodash');
 /**
  * Module dependencies.
  */
 
 var InvalidArgumentError = require('oauth2-server/lib/errors/invalid-argument-error');
-var NodeOAuthServer = require('oauth2-server');
 var Promise = require('bluebird');
-var Request = require('oauth2-server').Request;
-var Response = require('oauth2-server').Response;
-var UnauthorizedRequestError = require('oauth2-server/lib/errors/unauthorized-request-error');
 
+var UnauthorizedRequestError = require('oauth2-server/lib/errors/unauthorized-request-error');
+var Request = require('./requestWrapper');
+var Response = require('./responseWrapper');
 /**
  * Constructor.
  */
+module.exports = HapiOAuthServer;
 
-function ExpressOAuthServer(options) {
-  options = options || {};
+function HapiOAuthServer (options) {
+    options = options || {};
+    if (!options.model) {
+      throw new InvalidArgumentError('Missing parameter: `model`');
+    }
 
-  if (!options.model) {
-    throw new InvalidArgumentError('Missing parameter: `model`');
-  }
+    this.useErrorHandler = options.useErrorHandler ? true : false;
+    delete options.useErrorHandler;
 
-  this.useErrorHandler = options.useErrorHandler ? true : false;
-  delete options.useErrorHandler;
-
-  this.continueMiddleware = options.continueMiddleware ? true : false;
-  delete options.continueMiddleware;
-
-  this.server = new NodeOAuthServer(options);
+    this.continueMiddleware = options.continueMiddleware ? true : false;
+    delete options.continueMiddleware;
 }
 
 /**
@@ -39,23 +36,25 @@ function ExpressOAuthServer(options) {
  * (See: https://tools.ietf.org/html/rfc6749#section-7)
  */
 
-ExpressOAuthServer.prototype.authenticate = function(options) {
-  var that = this;
+HapiOAuthServer.prototype.authenticate = function(route, options) {
 
-  return function(req, res, next) {
-    var request = new Request(req);
-    var response = new Response(res);
+  return function(req, reply) {
+    var that = req.server.plugins.HapiOAuthServer;
 
+    var request = Request.fromHapi(req);
+    var response = Response.fromHapi(req);
     return Promise.bind(that)
       .then(function() {
-        return this.server.authenticate(request, response, options);
+        return that.server.authenticate(request, response, options);
       })
       .tap(function(token) {
-        res.locals.oauth = { token: token };
-        next();
+        req.locals = {};
+        req.locals.oauth = { token: token };
+        reply();
       })
       .catch(function(e) {
-        return handleError.call(this, e, req, res, null, next);
+        console.log(e);
+        return handleError.call(this, e, req, req.response, null, reply);
       });
   };
 };
@@ -68,28 +67,35 @@ ExpressOAuthServer.prototype.authenticate = function(options) {
  * (See: https://tools.ietf.org/html/rfc6749#section-3.1)
  */
 
-ExpressOAuthServer.prototype.authorize = function(options) {
-  var that = this;
+HapiOAuthServer.prototype.authorize = function(route, options) {
 
-  return function(req, res, next) {
-    var request = new Request(req);
-    var response = new Response(res);
+  console.log('authorize');
+
+  return function(req, reply) {
+    var that = req.server.plugins.HapiOAuthServer;
+    console.log('authorizeCb');
+    var request = new Request.fromHapi(req);
+    var response = new Response.fromHapi(req);
 
     return Promise.bind(that)
       .then(function() {
-        return this.server.authorize(request, response, options);
+        return that.server.authorize(request, response, options);
       })
       .tap(function(code) {
-        res.locals.oauth = { code: code };
-        if (this.continueMiddleware) {
-          next();
+        console.log('set code');
+        req.locals = {};
+        req.locals.oauth = { token: code };
+        if (that.continueMiddleware) {
+          reply.continue();
         }
       })
       .then(function() {
-        return handleResponse.call(this, req, res, response);
+        console.log('final');
+        return handleResponse.call(this, req, req.response, response, reply);
       })
       .catch(function(e) {
-        return handleError.call(this, e, req, res, response, next);
+        console.log('err', e);
+        return handleError.call(this, e, req, req.response, response, reply);
       });
   };
 };
@@ -102,28 +108,31 @@ ExpressOAuthServer.prototype.authorize = function(options) {
  * (See: https://tools.ietf.org/html/rfc6749#section-3.2)
  */
 
-ExpressOAuthServer.prototype.token = function(options) {
-  var that = this;
+HapiOAuthServer.prototype.token = function(route, options) {
 
-  return function(req, res, next) {
-    var request = new Request(req);
-    var response = new Response(res);
+  return function(req, reply) {
+    var that = req.server.plugins.HapiOAuthServer;
+    var request = Request.fromHapi(req);
+    var response = Response.fromHapi(req);
 
     return Promise.bind(that)
       .then(function() {
-        return this.server.token(request, response, options);
+        console.log('token()');
+        return that.server.token(request, response, options);
       })
       .tap(function(token) {
-        res.locals.oauth = { token: token };
-        if (this.continueMiddleware) {
-          next();
+        console.log('locals set');
+        req.locals = {};
+        req.locals.oauth = { token: token };
+        if (that.continueMiddleware) {
+          reply.continue();
         }
       })
-      .then(function() {
-        return handleResponse.call(this, req, res, response);
+      .then(function () {
+        return handleResponse.call(this, req, req.response, response, reply);
       })
-      .catch(function(e) {
-        return handleError.call(this, e, req, res, response, next);
+      .catch(function (e) {
+        return handleError.call(this, e, req, req.response, response, reply);
       });
   };
 };
@@ -131,16 +140,18 @@ ExpressOAuthServer.prototype.token = function(options) {
 /**
  * Handle response.
  */
-var handleResponse = function(req, res, response) {
+var handleResponse = function(req, res, response, reply) {
 
   if (response.status === 302) {
     var location = response.headers.location;
     delete response.headers.location;
-    res.set(response.headers);
-    res.redirect(location);
+    console.log('handleResponse()')//, response.headers, location);
+    // res.set(response.headers);
+    return reply.redirect(location);
   } else {
-    res.set(response.headers);
-    res.status(response.status).send(response.body);
+    console.log('handleResponseElse()') //, response.headers);
+    // res.set(response.headers);
+    reply(response.body)//.status(response.status).send();
   }
 };
 
@@ -148,27 +159,19 @@ var handleResponse = function(req, res, response) {
  * Handle error.
  */
 
-var handleError = function(e, req, res, response, next) {
+var handleError = function(e, req, res, response, reply) {
 
   if (this.useErrorHandler === true) {
-    next(e);
+    reply(e);
   } else {
-    if (response) {
-      res.set(response.headers);
-    }
+    var crafted = Response.toHapi(req, response, e);
 
-    res.status(e.code);
-
+    // console.log(req.response, crafted);
+    // console.log('precheck', crafted);
     if (e instanceof UnauthorizedRequestError) {
-      return res.send();
+      return reply();
     }
-
-    res.send({ error: e.name, error_description: e.message });
+    console.log('finalcheck');
+    return reply(crafted);
   }
 };
-
-/**
- * Export constructor.
- */
-
-module.exports = ExpressOAuthServer;

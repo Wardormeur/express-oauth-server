@@ -1,7 +1,7 @@
 {
-  "name": "express-oauth-server",
+  "name": "Hapi-oauth-server",
   "version": "2.0.0-b2",
-  "description": "OAuth provider for express",
+  "description": "OAuth provider for Hapi",
   "main": "index.js",
   "scripts": {
     "lint": "jshint .",
@@ -9,10 +9,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git://github.com/seegno/express-oauth-server"
+    "url": "git://github.com/seegno/Hapi-oauth-server"
   },
   "keywords": [
-    "express",
+    "Hapi",
     "oauth",
     "oauth2"
   ],
@@ -23,7 +23,8 @@
   "license": "SEE LICENSE IN LICENSE",
   "dependencies": {
     "bluebird": "^3.0.5",
-    "express": "^4.13.3",
+    "hapi": "^10.4",
+    "lodash": "^4.17.4",
     "oauth2-server": "next",
     "thenify": "^3.0.0"
   },

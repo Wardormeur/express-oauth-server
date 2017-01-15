@@ -4,11 +4,11 @@
  */
 
 var bodyParser = require('body-parser');
-var express = require('express');
+var Hapi = require('Hapi');
 var oauthServer = require('oauth2-server');
 
-// Create an Express application.
-var app = express();
+// Create an Hapi application.
+var app = Hapi();
 
 // Add body parser.
 app.use(bodyParser.json());

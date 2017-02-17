@@ -10,14 +10,19 @@ var responseWrapper = {
   },
   toHapi : function (request, response, error) {
     var crafted = request.generateResponse();
-    if (response && !_.isEmpty(response.headers)) {
-      _.each(response.headers, function (header, key) {
-        crafted.headers[key] = header;
-      });
+    request.plugins.HapiOAuthServer = {};
+    request.plugins.HapiOAuthServer.origin = true;
+    if (response) {
+      if (!_.isEmpty(response.headers)) {
+        _.each(response.headers, function (header, key) {
+          crafted.headers[key] = header;
+        });
+      }
+      crafted.body = response.body;
     }
     if (error) {
+      console.log('responseWrapper Err', error);
       crafted.source = { error: error.name, error_description: error.message };
-      console.log(error);
       crafted.code(error.code);
     }
     return crafted;

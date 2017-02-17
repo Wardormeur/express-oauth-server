@@ -36,24 +36,26 @@ function HapiOAuthServer (options) {
  * (See: https://tools.ietf.org/html/rfc6749#section-7)
  */
 
-HapiOAuthServer.prototype.authenticate = function(route, options) {
-
+HapiOAuthServer.prototype.authenticate = function(server, options) {
   return function(req, reply) {
     var that = req.server.plugins.HapiOAuthServer;
-
     var request = Request.fromHapi(req);
     var response = Response.fromHapi(req);
+    var authOptions = req.route.settings.plugins.HapiOAuthServer || options;
     return Promise.bind(that)
       .then(function() {
-        return that.server.authenticate(request, response, options);
+        return that.server.authenticate(request, response, authOptions);
       })
       .tap(function(token) {
         req.locals = {};
         req.locals.oauth = { token: token };
-        reply();
+        if (!authOptions.isHandler) {
+          console.log('reply.continue');
+          reply.continue({credentials: req.locals.oauth}); // This way we can use it both as a handler OR an auth middleware
+        }
       })
       .catch(function(e) {
-        console.log(e);
+        console.log('reply.continueErr', e);
         return handleError.call(this, e, req, req.response, null, reply);
       });
   };
@@ -69,32 +71,28 @@ HapiOAuthServer.prototype.authenticate = function(route, options) {
 
 HapiOAuthServer.prototype.authorize = function(route, options) {
 
-  console.log('authorize');
-
   return function(req, reply) {
     var that = req.server.plugins.HapiOAuthServer;
-    console.log('authorizeCb');
     var request = new Request.fromHapi(req);
     var response = new Response.fromHapi(req);
-
+    request.user = req.user;
+    var authOptions = req.route.settings.plugins.HapiOAuthServer || options;
     return Promise.bind(that)
       .then(function() {
-        return that.server.authorize(request, response, options);
+        return that.server.authorize(request, response, authOptions);
       })
       .tap(function(code) {
-        console.log('set code');
+        console.log('tapped');
         req.locals = {};
-        req.locals.oauth = { token: code };
+        req.locals.oauth = { code: code };
         if (that.continueMiddleware) {
           reply.continue();
         }
       })
       .then(function() {
-        console.log('final');
         return handleResponse.call(this, req, req.response, response, reply);
       })
       .catch(function(e) {
-        console.log('err', e);
         return handleError.call(this, e, req, req.response, response, reply);
       });
   };
@@ -109,19 +107,16 @@ HapiOAuthServer.prototype.authorize = function(route, options) {
  */
 
 HapiOAuthServer.prototype.token = function(route, options) {
-
   return function(req, reply) {
     var that = req.server.plugins.HapiOAuthServer;
     var request = Request.fromHapi(req);
     var response = Response.fromHapi(req);
-
+    var authOptions = req.route.settings.plugins.HapiOAuthServer || options;
     return Promise.bind(that)
       .then(function() {
-        console.log('token()');
-        return that.server.token(request, response, options);
+        return that.server.token(request, response, authOptions);
       })
       .tap(function(token) {
-        console.log('locals set');
         req.locals = {};
         req.locals.oauth = { token: token };
         if (that.continueMiddleware) {
@@ -145,13 +140,9 @@ var handleResponse = function(req, res, response, reply) {
   if (response.status === 302) {
     var location = response.headers.location;
     delete response.headers.location;
-    console.log('handleResponse()')//, response.headers, location);
-    // res.set(response.headers);
     return reply.redirect(location);
   } else {
-    console.log('handleResponseElse()') //, response.headers);
-    // res.set(response.headers);
-    reply(response.body)//.status(response.status).send();
+    reply(response.body);
   }
 };
 
@@ -166,12 +157,9 @@ var handleError = function(e, req, res, response, reply) {
   } else {
     var crafted = Response.toHapi(req, response, e);
 
-    // console.log(req.response, crafted);
-    // console.log('precheck', crafted);
     if (e instanceof UnauthorizedRequestError) {
       return reply();
     }
-    console.log('finalcheck');
     return reply(crafted);
   }
 };

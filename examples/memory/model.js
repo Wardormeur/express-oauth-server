@@ -2,11 +2,15 @@
 /**
  * Constructor.
  */
+var that;
 
 function InMemoryCache() {
-  this.clients = [{ clientId : 'thom', clientSecret : 'nightworld', redirectUris : [''] }];
+  this.clients = [{ clientId : 'ward-steward-2', clientSecret : 'something truly secret',
+    redirectUris : ['http://localhost:3001/auth/example-oauth2orize/callback'], grants: ['authorization_code'] }];
   this.tokens = [];
   this.users = [{ id : '123', username: 'thomseddon', password: 'nightworld' }];
+  this.authorizationCodes = [];
+  that = this;
 }
 
 /**
@@ -14,9 +18,9 @@ function InMemoryCache() {
  */
 
 InMemoryCache.prototype.dump = function() {
-  console.log('clients', this.clients);
-  console.log('tokens', this.tokens);
-  console.log('users', this.users);
+  console.log('clients', that.clients);
+  console.log('tokens', that.tokens);
+  console.log('users', that.users);
 };
 
 /*
@@ -24,7 +28,8 @@ InMemoryCache.prototype.dump = function() {
  */
 
 InMemoryCache.prototype.getAccessToken = function(bearerToken) {
-  var tokens = this.tokens.filter(function(token) {
+  console.log('getAccessToken');
+  var tokens = that.tokens.filter(function(token) {
     return token.accessToken === bearerToken;
   });
 
@@ -36,7 +41,8 @@ InMemoryCache.prototype.getAccessToken = function(bearerToken) {
  */
 
 InMemoryCache.prototype.getRefreshToken = function(bearerToken) {
-  var tokens = this.tokens.filter(function(token) {
+  console.log('getRefreshToken');
+  var tokens = that.tokens.filter(function(token) {
     return token.refreshToken === bearerToken;
   });
 
@@ -48,10 +54,10 @@ InMemoryCache.prototype.getRefreshToken = function(bearerToken) {
  */
 
 InMemoryCache.prototype.getClient = function(clientId, clientSecret) {
-  var clients = this.clients.filter(function(client) {
-    return client.clientId === clientId && client.clientSecret === clientSecret;
+  var clients = that.clients.filter(function(client) {
+    return client.clientId === clientId; // lazy auth && client.clientSecret === clientSecret;
   });
-
+  console.log('getClient', clients[0], clientId, clientSecret);
   return clients.length ? clients[0] : false;
 };
 
@@ -60,7 +66,8 @@ InMemoryCache.prototype.getClient = function(clientId, clientSecret) {
  */
 
 InMemoryCache.prototype.saveToken = function(token, client, user) {
-  this.tokens.push({
+  console.log('saveToken');
+  that.tokens.push({
     accessToken: token.accessToken,
     accessTokenExpiresAt: token.accessTokenExpiresAt,
     clientId: client.clientId,
@@ -75,12 +82,22 @@ InMemoryCache.prototype.saveToken = function(token, client, user) {
  */
 
 InMemoryCache.prototype.getUser = function(username, password) {
-  var users = this.users.filter(function(user) {
+  var users = that.users.filter(function(user) {
     return user.username === username && user.password === password;
   });
-
   return users.length ? users[0] : false;
 };
+
+/*
+ * Save authorization code.
+ */
+
+InMemoryCache.prototype.saveAuthorizationCode = function(authorization_code) {
+    console.log('saveAuthorizationCode');
+   that.authorizationCodes.push(authorization_code);
+};
+
+
 
 /**
  * Export constructor.

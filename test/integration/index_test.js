@@ -144,7 +144,8 @@ describe('HapiOAuthServer', function() {
           return code;
         }
       };
-      app.register({register: plugin, options: {model: model, continueMiddleware: true}}, function (err) {
+      // continueMiddleware: true
+      app.register({register: plugin, options: {model: model}}, function (err) {
         checkHapiPluginError('oauth')(err);
       });
 
